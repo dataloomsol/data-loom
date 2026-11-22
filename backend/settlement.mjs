@@ -21,9 +21,9 @@ export async function buildPayment({buyer,seller,platform,price,id,commitment,li
   const total=BigInt(price);
   if(total<10000n||total>1000000000000n)throw Error('Data Loom price out of range');
   const sellerAmount=total*70n/100n;
-  discount=total*5n/100n;
+  discount=total*10n/100n;
   const netFee=total-sellerAmount-discount;
-  burn=netFee*15n/100n;
+  burn=netFee*20n/100n;
   amounts={seller:sellerAmount,platform:netFee-burn};
  }
  if(buyer===seller)throw Error('You already own this dataset');

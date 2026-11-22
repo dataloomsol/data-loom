@@ -1,3 +1,4 @@
+import { installBakeOffs } from './bake-offs.mjs';
 import {inferDecision,validateInput} from './agent-tools.mjs';
 import {allocatePoolPayouts,installPoolTables,POOL_TERMS} from './benchmark-pools.mjs';
 import {installReleaseGates, releaseGateSchema} from './release-gates.mjs';
@@ -61,10 +62,10 @@ function checkTrialReceipt(evidence){
  if(evidence?.provider!=='phala'||!evidence.receiptId||!evidence.verifiedAt)throw Error('Trial inference receipt missing');
  validatePhalaReceipt({receipt_id:evidence.receiptId,verdict:{verified:true},checks:evidence.checks},evidence.receiptId);
 }
-export async function evaluateBenchmark({cases,models,env,infer=phalaTrial,beforeCase,impact,router}){
+export async function evaluateBenchmark({cases,models,env,infer=phalaTrial,beforeCase,impact,router,candidatePrompt,benchmarkPrompt}){
  const results=[];
  for(const [index,model] of models.entries()){
-  let correct=0,totalMs=0;
+  let correct=0,totalMs=0,reportedCostUsd=0;
   const categories=Object.create(null),receipts=[],toolReceipts=[];
   for(const c of cases){if(beforeCase)await beforeCase(c);const start=Date.now();
    let tool;
@@ -74,13 +75,14 @@ export async function evaluateBenchmark({cases,models,env,infer=phalaTrial,befor
     toolReceipts.push(tool.evidence);
     if(beforeCase)await beforeCase(c);
    }
-   const r=await infer({prompt:c.prompt,model,env,...(tool?{toolDecision:tool.output.decision}:{})});
+   const r=await infer({prompt:c.prompt,model,env,...((benchmarkPrompt||(index===1&&candidatePrompt))?{candidatePrompt:benchmarkPrompt||candidatePrompt}:{}),...(tool?{toolDecision:tool.output.decision}:{})});
    // Do not allow an adapter to silently return conventional or unverified output.
    checkTrialReceipt(r.evidence);
+   reportedCostUsd = reportedCostUsd === null || r.reportedCostUsd == null ? null : reportedCostUsd + r.reportedCostUsd;
    const ok=normalizeAnswer(r.answer)===normalizeAnswer(c.expectedAnswer);correct+=Number(ok);totalMs+=Date.now()-start;
    const group=categories[c.category]??={total:0,correct:0};group.total++;group.correct+=Number(ok);receipts.push(r.evidence);
   }
-  results.push({model,total:cases.length,correct,accuracy:correct/cases.length,averageLatencyMs:Math.round(totalMs/cases.length),categories,receipts,...(impact?{condition:index===0?'baseline':'assisted',toolReceipts}:{})});
+  results.push({model,total:cases.length,correct,accuracy:correct/cases.length,averageLatencyMs:Math.round(totalMs/cases.length),categories,receipts,...(benchmarkPrompt!==undefined?{reportedCostUsd}:{}),...(impact?{condition:index===0?'baseline':'assisted',toolReceipts}:{})});
  }
  const [baseline,assisted]=results;
  const comparison=impact?{tool:impact.tool,toolCommitment:impact.toolCommitment,toolCost:String(impact.toolCost),accuracyDelta:assisted.accuracy-baseline.accuracy,
@@ -181,7 +183,8 @@ export async function installBlindTrials(app,{db,storage,env,authenticated,build
  const prepareTrial=async(wallet,input,watchGuard)=>{
   const respond=(status,data)=>({status,data});
   if(!enabled)return respond(503,{error:'Verified confidential trials are not ready'});
-  const body=z.object({dataset:uuid.optional(),datasets:z.array(uuid).min(2).max(3).optional(),models:z.array(z.string().max(200)).min(2).max(3),router:routerSchema.optional(),impact:z.boolean().default(false),consent:z.literal(true),version:z.union([z.literal(0),z.literal(1)]).default(0),releaseGate:releaseGateSchema.optional()}).strict().parse(input);
+  const body=z.object({dataset:uuid.optional(),datasets:z.array(uuid).min(2).max(3).optional(),models:z.array(z.string().max(200)).min(2).max(3),router:routerSchema.optional(),impact:z.boolean().default(false),consent:z.literal(true),version:z.union([z.literal(0),z.literal(1)]).default(0),releaseGate:releaseGateSchema.optional(),candidatePrompt:z.string().min(1).max(4000).optional()}).strict().parse(input);
+  if(body.candidatePrompt&&(!body.releaseGate||body.impact||body.router||body.datasets))return respond(400,{error:"Candidate prompts require a single benchmark with a release gate"});
   if(body.router){
    if(!routingModels.length)return respond(503,{error:'Three verified router models are required'});
    if(body.datasets||body.impact||body.releaseGate||watchGuard||body.models.length!==3||
@@ -190,7 +193,7 @@ export async function installBlindTrials(app,{db,storage,env,authenticated,build
   }else if(body.models.length!==2||body.models.some(model=>!TRIAL_MODELS.includes(model))){
    return respond(400,{error:'Choose two supported trial models'});
   }
-  if(!body.router&&new Set(body.models).size!==(body.impact?1:2))return respond(400,{error:body.impact?'Choose the same model for both runs':'Choose two distinct models'});
+  if(!body.router&&!body.candidatePrompt&&new Set(body.models).size!==(body.impact?1:2))return respond(400,{error:body.impact?'Choose the same model for both runs':'Choose two distinct models'});
   const pooled=Boolean(body.datasets);
   if(Boolean(body.dataset)===pooled)return respond(400,{error:'Choose either a single benchmark or a pool'});
   const ids=pooled?[...new Set(body.datasets)].sort():[body.dataset];
@@ -246,7 +249,7 @@ export async function installBlindTrials(app,{db,storage,env,authenticated,build
      return respond(429,{error:'Benchmark daily trial capacity reached'});
     }
    }
-   if(body.releaseGate)await gates.save(id,body.releaseGate);
+   if(body.releaseGate)await gates.save(id,body.releaseGate,body.candidatePrompt);
    await db.query('INSERT INTO trial_jobs(id,buyer,state,created) VALUES(?,?,?,?)',[id,wallet,'running',Date.now()]);
    void (async()=>{try{
    const batches=await Promise.all(sources.map(async source=>({
@@ -267,7 +270,7 @@ export async function installBlindTrials(app,{db,storage,env,authenticated,build
     const current=await select(d.id);
     if(!current||current.consented!==d.consented||current.commitment!==d.commitment||String(current.trial_price)!==String(d.trial_price))throw Error('Benchmark consent or pricing changed');
    };
-   const scorecard=await evaluateBenchmark({cases,models:body.models,env,infer,impact,router:body.router,beforeCase:body.router?checkRouterConsent:tool?checkImpact:pooled?c=>checkPoolConsent(c.source):undefined});
+   const scorecard=await evaluateBenchmark({cases,models:body.models,env,infer,impact,candidatePrompt:body.candidatePrompt,router:body.router,beforeCase:body.router?checkRouterConsent:tool?checkImpact:pooled?c=>checkPoolConsent(c.source):undefined});
    const poolSources=pooled?allocatePoolPayouts(batches.map(({source,cases})=>({
     dataset:source.id,title:source.title,owner:source.owner,commitment:source.commitment,cases:cases.length
    })),price):undefined;
@@ -300,6 +303,7 @@ export async function installBlindTrials(app,{db,storage,env,authenticated,build
   }catch(e){active.delete(wallet);throw e}finally{if(!await db.one("SELECT id FROM trial_jobs WHERE id=? AND state='running'",[id]))active.delete(wallet)}
  };
  app.post('/api/trial-orders',authenticated,async(req,res)=>{const r=await prepareTrial(req.wallet,req.body);res.status(r.status).json(r.data)});
+ await installBakeOffs(app,{db,storage,authenticated,models:enabled?(routingModels.length?routingModels:TRIAL_MODELS):[],parseBenchmark,evaluateBenchmark,env,infer});
  await installRegressionWatch(app,{db,storage,authenticated,enabled,prepareTrial});
  app.get('/api/trial-jobs/:id',authenticated,async(req,res)=>{const j=await db.one('SELECT * FROM trial_jobs WHERE id=? AND buyer=?',[uuid.parse(req.params.id),req.wallet]);if(!j)return res.status(404).json({error:'Trial preparation not found'});if(j.state!=='ready')return res.json({id:j.id,state:j.state,...(j.state==='failed'?{error:'Trial did not complete with verified receipts. No payment was prepared; retry tomorrow.'}:{})});const o=await db.one('SELECT * FROM trial_orders WHERE id=?',[j.id]);res.json({id:j.id,state:'ready',transaction:o.tx,summary:JSON.parse(o.summary),terms:o.terms,simulation:true})});
  app.post('/api/trial-orders/:id/payment',authenticated,async(req,res)=>{

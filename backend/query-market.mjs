@@ -26,7 +26,7 @@ export async function installQueryMarket(app,{db,storage,env,authenticated,build
  const enabled=env.ENABLE_QUERY_PAYMENTS==='true'&&(confidential||(env.ENABLE_CONVENTIONAL_QUERY_PROCESSING==='true'&&!!env.AI_API_KEY&&!!env.AI_MODEL))&&!!env.SOLANA_RPC_URL&&validWallet(env.PLATFORM_WALLET||'');
  const tokenEnabled=enabled&&confidential;
  const tokenTerms=base=>base.replace('70% goes to the contributor, 30% to the platform. No token buyback or burn.',
-  'Paid in DATALOOM. The buyer saves 5% of the listed token price from the platform fee. The contributor receives 70% of the listed price. The checkout burns 15% of the discounted platform fee, with rounding to token base units.');
+  'Paid in DATALOOM. The buyer saves 10% of the listed token price from the platform fee. The contributor receives 70% of the listed price. The checkout burns 20% of the discounted platform fee, with rounding to token base units.');
  const tokenJoin='LEFT JOIN query_token_prices tp ON tp.dataset=d.id AND tp.consented=p.consented';
  const withSummary='SELECT o.*,r.summary FROM query_orders o LEFT JOIN query_receipts r ON r.order_id=o.id';
  const currency=o=>o.summary&&JSON.parse(o.summary).mint===DATALOOM?'DATALOOM':'USDC';

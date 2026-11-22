@@ -1,4 +1,4 @@
-import { createPrivateKey, createPublicKey, hkdfSync, sign } from 'node:crypto';
+import { createPrivateKey, createPublicKey, hkdfSync, sign, createHash } from 'node:crypto';
 import { z } from 'zod';
 
 export const releaseGateSchema = z.object({
@@ -28,15 +28,16 @@ export async function installReleaseGates(app, { db, env }) {
 
   return {
     available,
-    async save(trial, policy) {
-      await db.query('INSERT INTO trial_release_gates (trial, policy) VALUES (?, ?)', [trial, JSON.stringify(policy)]);
+    async save(trial, policy, candidatePrompt) {
+      await db.query('INSERT INTO trial_release_gates (trial, policy) VALUES (?, ?)', [trial, JSON.stringify({policy,promptHash:candidatePrompt?createHash("sha256").update(candidatePrompt).digest("hex"):null})]);
     },
     async receipt(order, scorecard) {
       if (!available || order.state !== 'paid' || !order.signature) return undefined;
       const row = await db.one('SELECT policy FROM trial_release_gates WHERE trial=?', [order.id]);
       if (!row) return undefined;
 
-      const policy = releaseGateSchema.parse(JSON.parse(row.policy));
+      const saved = JSON.parse(row.policy);
+      const policy = releaseGateSchema.parse(saved.policy ?? saved);
       const [baseline, candidate] = scorecard.models;
       const checks = [{
         rule: 'minimum-accuracy',
@@ -59,7 +60,10 @@ export async function installReleaseGates(app, { db, env }) {
         trial: order.id,
         policy,
         benchmark: order.commitment,
+        promptHash: saved.promptHash ?? null,
+        candidateScore: { correct: candidate.correct, total: candidate.total },
         scoring: scorecard.scoring,
+        scorecardHash: createHash("sha256").update(JSON.stringify(scorecard)).digest("hex"),
         baseline: baseline.model,
         candidate: candidate.model,
         evaluatedAt,
