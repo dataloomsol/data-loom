@@ -4,6 +4,8 @@ Data Loom is a marketplace for licensing datasets, running confidential AI queri
 
 [Open Data Loom](https://dataloom.live/) · [Production status](https://dataloom.live/api/status) · [Release history](RELEASE-HISTORY.md)
 
+The public Git history starts with a retrospective import on November 22, 2026. The release history records earlier deployment evidence and recovered source dates.
+
 ## What you can do
 
 | Workflow | Capabilities |

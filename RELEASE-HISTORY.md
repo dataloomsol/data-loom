@@ -1,6 +1,17 @@
 # Data Loom release history
 
-The earliest locally documented Data Loom release is November 2, 2026. The original README from that day is preserved in the first commit.
+The public GitHub repository was created on **November 22, 2026**. The Git history is a retrospective import of local release material. Commit timestamps record the reconstruction, and the dates below refer to documented releases or recovered snapshots. No original Git history was available for this import.
+
+| Date (IST) | Release evidence or recovered snapshot |
+| --- | --- |
+| Nov 2 | Earliest documented release and original project README |
+| Nov 16 | Token discount backend archive |
+| Nov 17 | Model bake-offs backend archive |
+| Nov 18 | Private Memory backend snapshot |
+| Nov 19 | Private Data Rooms and Requests backend snapshot |
+| Nov 20 | Private Evidence Packs backend snapshot |
+| Nov 21 | Private Benchmark Builder and escrow backend snapshot |
+| Nov 22 | Private Dataset Diff and current source import |
 
 Locally preserved release filenames document the early releases. These artifacts are encrypted and are excluded from Git. A filename records the release series; it does not establish a commit or exact deploy time.
 
