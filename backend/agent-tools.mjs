@@ -1,3 +1,4 @@
+import {installEvidencePacks} from './evidence-packs.mjs';
 import {installAgentRooms} from './agent-rooms.mjs';
 import {DATA_REQUEST_TERMS,installDataRequests} from './data-requests.mjs';
 import {installAgentMemory} from './agent-memory.mjs';
@@ -76,6 +77,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
   if(!grant)return res.status(401).json({error:'A valid agent key is required'});
   req.grant=grant;next();
  };
+ await installEvidencePacks(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
  await installAgentMemory(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
  const release=(grant,id,amount=0)=>db.query(`UPDATE agent_grants SET pending=NULL,spent=spent-? WHERE id=? AND pending=?`,
   [amount,grant.id,id]);
