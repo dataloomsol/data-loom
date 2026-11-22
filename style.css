@@ -26,3 +26,9 @@ dialog:has([data-save]){width:min(92vw,32rem);padding:1.5rem;color:#171a16;backg
 .trial-score-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}#blind-trials pre{white-space:pre-wrap;overflow-wrap:anywhere}#blind-trials form{margin:20px 0}#trial-scorecard p,#trial-scorecard h4{overflow-wrap:anywhere}@media(max-width:640px){.trial-score-grid{grid-template-columns:1fr}}
 
 #ledger-detail code{overflow-wrap:anywhere} #ledger-version{max-width:100%}
+
+.footer-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
