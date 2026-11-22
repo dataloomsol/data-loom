@@ -1,3 +1,5 @@
+import {installAgentRooms} from './agent-rooms.mjs';
+import {DATA_REQUEST_TERMS,installDataRequests} from './data-requests.mjs';
 import {installAgentMemory} from './agent-memory.mjs';
 import {BATCH_TERMS,MAX_BATCH_CASES,installBatchTables,installAgentBatches} from './agent-batches.mjs';
 import {randomUUID} from 'node:crypto';
@@ -77,10 +79,11 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
  await installAgentMemory(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
  const release=(grant,id,amount=0)=>db.query(`UPDATE agent_grants SET pending=NULL,spent=spent-? WHERE id=? AND pending=?`,
   [amount,grant.id,id]);
+ await installDataRequests(app,{db,storage,env,bearer,authenticated,sourceAvailable,grantSelect,build,release});
  const callInfo=async call=>{
   if(!call.signature){
    const q=JSON.parse(call.quote);
-   return {id:call.id,state:q.expired?'expired':'prepared',...(!q.expired?{transaction:q.transaction,summary:q.summary,lastValidBlockHeight:q.lastValidBlockHeight,simulation:true}:{}),terms:q.batch?BATCH_TERMS:TERMS,...(q.batch?{caseCount:q.caseCount}: {})};
+   return {id:call.id,state:q.expired?'expired':'prepared',...(!q.expired?{transaction:q.transaction,summary:q.summary,lastValidBlockHeight:q.lastValidBlockHeight,simulation:true}:{}),terms:q.dataRequest?DATA_REQUEST_TERMS:q.batch?BATCH_TERMS:TERMS,...(q.batch?{caseCount:q.caseCount}: {})};
   }
   return {id:call.id,state:'paid',signature:call.signature,...await storage.get(call.id)};
  };
@@ -165,7 +168,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
   if(!await sourceAvailable(g))return res.status(409).json({error:'Dataset unavailable for agent calls'});
   if(g.pending&&await db.one('SELECT id FROM agent_calls WHERE id=? AND signature IS NOT NULL',[g.pending]))await release(g,g.pending);
   const id=randomUUID();
-  const {rows}=await db.query('UPDATE agent_grants SET pending=?,spent=spent+? WHERE id=? AND token_hash=? AND revoked=0 AND pending IS NULL AND spent+?<=cap RETURNING id',
+  const {rows}=await db.query('UPDATE agent_grants SET pending=?,spent=spent+? WHERE id=? AND token_hash IS NOT DISTINCT FROM ? AND revoked=0 AND pending IS NULL AND spent+?<=cap RETURNING id',
    [id,g.price,g.id,g.token_hash,g.price]);
   if(!rows.length)return res.status(409).json({error:'Grant cap reached or another call is pending'});
   let stored=false;
@@ -187,7 +190,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
    stored=true;
    const created=Date.now();
    const call=await db.query(`INSERT INTO agent_calls(id,grant_id,request_id,quote,created)
-    SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM agent_grants WHERE id=? AND pending=? AND token_hash=? AND revoked=0)
+    SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM agent_grants WHERE id=? AND pending=? AND token_hash IS NOT DISTINCT FROM ? AND revoked=0)
     AND EXISTS (SELECT 1 FROM datasets d WHERE d.id=? AND d.commitment=? AND d.state<>'published' AND ${unpaused}
       AND NOT EXISTS (SELECT 1 FROM trial_policies t WHERE t.dataset=d.id AND t.enabled=1)) RETURNING id`,
     [id,g.id,body.requestId,JSON.stringify(q),created,g.id,id,g.token_hash,g.dataset,g.commitment]);
@@ -200,6 +203,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
    }
   }
  };
+ await installAgentRooms(app,{db,env,authenticated,grantSelect,sourceAvailable,prepareCall,callInfo,settle});
  app.post('/api/agent/v1/calls',bearer,prepareCall(false));
  app.post('/api/agent/v1/delegations',bearer,prepareCall(true));
  installAgentBatches(app,{db,storage,env,enabled,grantSelect,bearer,authenticated,sourceAvailable,validateInput,
@@ -250,7 +254,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
    }
    if(!complete)return res.status(409).json({error:'Recover with the existing transaction signature'});
    const expired=await db.query('UPDATE agent_calls SET quote=? WHERE id=? AND quote=? AND signature IS NULL RETURNING id',
-    [JSON.stringify(q.batch?{expired:true,batch:true,caseCount:q.caseCount,price:q.price}:{expired:true,inputHash:q.inputHash}),call.id,call.quote]);
+    [JSON.stringify(q.batch?{expired:true,batch:true,caseCount:q.caseCount,price:q.price}:{expired:true,inputHash:q.inputHash,...(q.dataRequest?{dataRequest:true}:{})}),call.id,call.quote]);
    if(!expired.rows.length)return res.status(409).json({error:'Call settlement changed; refresh first'});
   }
   if(q.batch)return res.json({id:call.id,state:'ready',caseCount:q.caseCount,price:q.price});
