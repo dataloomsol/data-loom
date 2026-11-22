@@ -1,0 +1,39 @@
+{
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 120
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.dataloom.live"
+        }
+      ],
+      "destination": "https://dataloom.live/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "destination": "https://8565ca2295dfaf2802876459a03ddff65194b4eb-9200.dstack-pha-prod5.phala.network/",
+      "permanent": false
+    },
+    {
+      "source": "/index.html",
+      "destination": "https://8565ca2295dfaf2802876459a03ddff65194b4eb-9200.dstack-pha-prod5.phala.network/",
+      "permanent": false
+    }
+  ]
+}

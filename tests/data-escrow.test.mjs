@@ -1,0 +1,32 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {randomUUID} from 'node:crypto';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import express from 'express';
+import {evaluateEscrow,canonical,installDataEscrow} from '../backend/data-escrow.mjs';import {openDb} from '../backend/db.mjs';import {openStorage} from '../backend/storage.mjs';
+const criteria={minRows:2,maxRows:10,requiredFields:[{name:'category',type:'string'},{name:'answer',type:'string'}],minCompletenessBps:10000,maxDuplicateBps:0,coverage:{field:'category',values:['a','b'],minPerValue:1}};
+const content=JSON.stringify([{category:'a',answer:'yes'},{category:'b',answer:'no'}]);
+test('escrow checks deterministic structural criteria without disclosing records',()=>{
+ const r=evaluateEscrow(content,criteria);assert.equal(r.passed,true);assert.equal(JSON.stringify(r).includes('yes'),false);
+ assert.equal(evaluateEscrow(JSON.stringify([{category:'a',answer:'yes'},{category:'a',answer:'yes'}]),criteria).passed,false);
+ assert.equal(evaluateEscrow(JSON.stringify([{category:'a',answer:'yes'},{category:'b',answer:''}]),criteria).checks.completeness,false);
+ assert.throws(()=>evaluateEscrow('not JSON',criteria));assert.throws(()=>evaluateEscrow(content,{...criteria,maxRows:1}));
+ assert.equal(canonical({b:2,a:1}),canonical({a:1,b:2}));
+ assert.equal(evaluateEscrow('[{"answer":"yes","category":"a"},{"category":"a","answer":"yes"}]',{...criteria,coverage:null}).checks.duplicates,false);
+});
+test('escrow locks accepted terms, restricts private preflight and never substitutes direct checkout',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'loom-escrow-')),env={DATA_DIR:dir},db=await openDb(env),storage=await openStorage(env);t.after(async()=>{await db.close();await fs.rm(dir,{recursive:true,force:true});});
+ const app=express();app.use(express.json());const auth=(req,res,next)=>{req.wallet=req.get('x-wallet');return req.wallet?next():res.sendStatus(401);};await installDataEscrow(app,{db,storage,authenticated:auth});app.use((e,q,s,n)=>s.status(400).json({error:e.message}));
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+ const buyer='9zzN2FkbG2AwHZCH1cnH6Wxo4V7YzFoKKqJXRvLATohJ',owner='GKFXhctEm8VQpejF7QK8hQptQmhS4rkj1hTehrXofoH5',dataset=randomUUID();
+ await db.query('CREATE TABLE IF NOT EXISTS consent_state(dataset TEXT PRIMARY KEY,paused INTEGER,updated BIGINT)');
+ await db.query('INSERT INTO datasets VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[dataset,owner,'Private data','General','Private table for escrow','Preview','key','commit','fp',10000,'research-v1','draft',Date.now(),'{}']);await storage.put(dataset,{content});
+ const request=async(p,wallet,body)=>{const r=await fetch('http://127.0.0.1:'+server.address().port+p,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(wallet?{'x-wallet':wallet}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};};
+ const made=await request('/api/my/data-escrows',buyer,{contributor:owner,title:'Coverage request',price:10000,days:7,license:'research-v1',criteria});assert.equal(made.status,201);const id=made.data.id,p='/api/my/data-escrows/'+id;
+ assert.equal((await request(p+'/accept',buyer,{termsHash:made.data.termsHash})).status,404);
+ assert.equal((await request(p+'/accept',owner,{termsHash:'0'.repeat(64)})).status,409);
+ assert.equal((await request(p+'/accept',owner,{termsHash:made.data.termsHash})).status,200);
+ assert.equal((await request('/api/my/data-escrows','stranger')).data.requests.length,0);
+ assert.equal((await request(p+'/preflight',buyer,{dataset,consent:true})).status,400);
+ const preview=await request(p+'/preflight',owner,{dataset,consent:true});assert.equal(preview.data.report.passed,true);assert.equal(JSON.stringify(preview.data).includes('yes'),false);
+ for(const action of ['fund','submit','release','refund','download'])assert.equal((await request(p+'/'+action,buyer,{})).status,503);
+ assert.equal((await request('/api/data-escrow/status')).data.fundingEnabled,false);
+ await db.query('INSERT INTO consent_state VALUES(?,1,?)',[dataset,Date.now()]);assert.equal((await request(p+'/preflight',owner,{dataset,consent:true})).status,400);
+ await db.query('UPDATE data_escrows SET deadline=0 WHERE id=?',[id]);assert.equal((await request(p+'/preflight',owner,{dataset,consent:true})).status,409);
+});

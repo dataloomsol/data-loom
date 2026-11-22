@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {configureConfidentialRuntime} from '../backend/confidential-runtime.mjs';
+test('ordinary hosting cannot claim protected runtime',async()=>{const e={NODE_ENV:'production'};const r=await configureConfidentialRuntime(e);assert.equal(r.ready,false);assert.equal(r.env,e);await assert.rejects(()=>configureConfidentialRuntime({CONFIDENTIAL_RUNTIME:'phala',VERCEL:'1'}),/cannot execute/);});

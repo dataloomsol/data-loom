@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {guardAnswer} from '../backend/output-policy.mjs';
+test('answer policy rejects copied passages, identifiers and oversized output',()=>{const source='one two three four five six seven eight nine ten eleven twelve thirteen fourteen';assert.throws(()=>guardAnswer(source,source));assert.throws(()=>guardAnswer('Email person@example.com for details',source));assert.throws(()=>guardAnswer('x'.repeat(6001),source));assert.equal(guardAnswer('A short thematic summary.',source),'A short thematic summary.');});

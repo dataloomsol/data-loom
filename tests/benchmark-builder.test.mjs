@@ -1,0 +1,30 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';import express from 'express';import {buildBenchmark,installBenchmarkBuilder} from '../backend/benchmark-builder.mjs';import {hash} from '../backend/security.mjs';import {openDb} from '../backend/db.mjs';import {openStorage} from '../backend/storage.mjs';import {parseBenchmark} from '../backend/blind-trials.mjs';
+const rows=[...Array.from({length:9},(_,i)=>({q:'Category A question '+i,a:i,cat:'Alpha'})),...Array.from({length:5},(_,i)=>({q:'Category B question '+i,a:i,cat:'Bravo'}))];const config={promptField:'q',answerField:'a',categoryField:'cat',answerFormat:'number',balance:true,maxCases:20};
+test('builder validates answer formats, detects normalized duplicate conflicts and balances compatible benchmarks',()=>{
+ const b=buildBenchmark(JSON.stringify(rows),config);assert.equal(b.report.valid,true);assert.equal(b.cases.length,10);assert.deepEqual(b.report.categories.map(x=>x.selected),[5,5]);assert.equal(parseBenchmark(JSON.stringify(b.cases)).length,10);assert.equal(typeof b.cases[0].expectedAnswer,'string');
+ const dup=buildBenchmark(JSON.stringify([...rows,{...rows[0],q:'  CATEGORY A QUESTION 0  '}]),config);assert.equal(dup.report.duplicateCount,1);assert.equal(dup.report.valid,true);
+ assert.equal(buildBenchmark(JSON.stringify([...rows,{...rows[0],a:99}]),config).report.valid,false);
+ assert.equal(buildBenchmark(JSON.stringify(rows.slice(0,4)),config).report.valid,false);
+ assert.equal(buildBenchmark(JSON.stringify(rows),{...config,maxCases:5}).report.valid,false);
+ assert.equal(buildBenchmark(JSON.stringify(rows),{...config,balance:false}).cases.length,14);
+ assert.equal(buildBenchmark(JSON.stringify(rows),{...config,categories:['Alpha']}).cases.length,9);
+ assert.equal(buildBenchmark(JSON.stringify(rows),{...config,categories:['Missing']}).report.valid,false);
+ const bool=rows.slice(0,5).map((x,i)=>({...x,a:i%2===0}));assert.equal(buildBenchmark(JSON.stringify(bool),{...config,answerFormat:'boolean'}).report.valid,true);
+ assert.equal(buildBenchmark(JSON.stringify(bool),{...config,answerFormat:'text'}).report.valid,false);
+ const choice=bool.map(x=>({...x,a:'yes'}));assert.equal(buildBenchmark(JSON.stringify(choice),{...config,answerFormat:'choice',choices:['yes','no']}).report.valid,true);
+ assert.throws(()=>buildBenchmark(JSON.stringify(choice),{...config,answerFormat:'choice',choices:['YES','yes']}));
+ assert.throws(()=>buildBenchmark('{}',config));
+});
+test('builder owner routes bind review to source, create encrypted private derivatives and leave paid access disabled',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'loom-builder-')),db=await openDb({DATA_DIR:dir}),storage=await openStorage({DATA_DIR:dir});t.after(async()=>{await db.close();await fs.rm(dir,{recursive:true,force:true})});
+ const source=randomUUID(),salt='test-salt',content=JSON.stringify(rows),commitment=hash(salt+'\n'+content);await db.query('INSERT INTO datasets VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[source,'owner','Private source','Research','Source table description','Private preview','key',commitment,'fp',10000,'research-v1','draft',Date.now(),'{}']);await storage.put(source,{content,salt});
+ const app=express();app.use(express.json());const authenticated=(q,s,next)=>{q.wallet=q.get('x-wallet');q.wallet?next():s.sendStatus(401)};await installBenchmarkBuilder(app,{db,storage,authenticated});app.use((e,q,s,n)=>s.status(400).json({error:e.message}));const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+ const request=async(route,wallet,body)=>{const r=await fetch('http://127.0.0.1:'+server.address().port+'/api'+route,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(wallet?{'x-wallet':wallet}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()}};
+ const input={dataset:source,config};assert.equal((await request('/my/benchmark-builder/analyze','stranger',input)).status,400);
+ const analyzed=await request('/my/benchmark-builder/analyze','owner',input);assert.equal(analyzed.status,200);assert.equal(analyzed.data.report.valid,true);assert.equal(JSON.stringify(analyzed.data).includes('Category A question'),false);
+ const save={...input,title:'Balanced private benchmark',reportHash:analyzed.data.reportHash,consent:true};assert.equal((await request('/my/benchmark-builder/save','owner',{...save,config:{...config,maxCases:10}})).status,409);
+ const saved=await request('/my/benchmark-builder/save','owner',save);assert.equal(saved.status,201);assert.equal(saved.data.trialEnabled,false);const d=await db.one('SELECT * FROM datasets WHERE id=?',[saved.data.id]);assert.equal(d.state,'draft');assert.equal(d.license,'research-v1');assert.equal(JSON.parse(d.analysis).lineage.parentCommitment,commitment);const object=await storage.get(d.id);assert.equal(parseBenchmark(object.content).length,10);assert.equal(hash(object.salt+'\n'+object.content),d.commitment);
+ const report='/my/benchmark-builder/'+d.id+'/report';assert.equal((await request(report,'stranger')).status,404);assert.equal((await request(report,'owner')).data.reportHash,save.reportHash);assert.equal((await request('/my/benchmark-builder/save','owner',save)).status,409);
+ await db.query('INSERT INTO consent_state VALUES(?,1,?)',[source,Date.now()]);assert.equal((await request('/my/benchmark-builder/analyze','owner',input)).status,400);await db.query('UPDATE consent_state SET paused=0 WHERE dataset=?',[source]);await storage.put(source,{content:'[]',salt});assert.equal((await request('/my/benchmark-builder/analyze','owner',input)).status,400);
+ assert.equal((await request('/benchmark-builder/status')).data.requiresOnchainDeployment,false);
+});

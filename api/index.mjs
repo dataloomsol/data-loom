@@ -1,0 +1,2 @@
+// Confidential requests must go directly to the verified CVM, not via Vercel.
+export default function handler(req,res){res.statusCode=410;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error:'The API has moved to the protected Data Loom application. Open the live site and sign in again.',application:"https://8565ca2295dfaf2802876459a03ddff65194b4eb-9200.dstack-pha-prod5.phala.network"}));}

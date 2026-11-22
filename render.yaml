@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: data-loom
+    runtime: docker
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: STORAGE_MASTER_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: PLATFORM_WALLET
+        value: GKFXhctEm8VQpejF7QK8hQptQmhS4rkj1hTehrXofoH5
+      - key: ENABLE_LISTINGS
+        value: "false"
+      - key: ENABLE_PAYMENTS
+        value: "false"
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false
