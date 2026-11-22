@@ -1,3 +1,4 @@
+import {installAgentMemory} from './agent-memory.mjs';
 import {BATCH_TERMS,MAX_BATCH_CASES,installBatchTables,installAgentBatches} from './agent-batches.mjs';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -73,6 +74,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
   if(!grant)return res.status(401).json({error:'A valid agent key is required'});
   req.grant=grant;next();
  };
+ await installAgentMemory(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
  const release=(grant,id,amount=0)=>db.query(`UPDATE agent_grants SET pending=NULL,spent=spent-? WHERE id=? AND pending=?`,
   [amount,grant.id,id]);
  const callInfo=async call=>{
@@ -95,7 +97,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
   return callInfo(call);
  };
 
- app.get('/api/agent-tools/status',(req,res)=>res.json({enabled,terms:TERMS,batch:{maxCases:MAX_BATCH_CASES,terms:BATCH_TERMS},delegation:{enabled,path:'/api/agent/v1/delegations'}}));
+ app.get('/api/agent-tools/status',(req,res)=>res.json({enabled,terms:TERMS,batch:{maxCases:MAX_BATCH_CASES,terms:BATCH_TERMS},delegation:{enabled,path:'/api/agent/v1/delegations'},memory:{enabled:true,path:'/api/agent/v1/memories',maxRetentionDays:30}}));
  app.get('/api/my/agent-tools',authenticated,async(req,res)=>{
   const {rows:tools}=await db.query('SELECT * FROM agent_tools WHERE owner=? ORDER BY created DESC',[req.wallet]);
   const {rows:grants}=await db.query(grantSelect+' WHERE t.owner=? OR g.buyer=? ORDER BY g.created DESC',[req.wallet,req.wallet]);
