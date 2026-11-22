@@ -1,3 +1,5 @@
+import {installBenchmarkBuilder} from './benchmark-builder.mjs';
+import {installDataEscrow} from './data-escrow.mjs';
 import { installSettlementHook } from './settlement-hook.mjs';
 import {installPrivateSql} from './private-sql.mjs';
 import {replayWorkflow} from './workflow-replay.mjs';
@@ -21,6 +23,8 @@ function publicAnalysis(row) {
 }
 export async function installApi(app,{db,storage,env,protectedRuntime=false}){const origin=env.APP_ORIGIN||'http://127.0.0.1:9200',platform=env.PLATFORM_WALLET||'',listings=env.ENABLE_LISTINGS==='true',payments=env.ENABLE_PAYMENTS==='true'&&listings&&validWallet(platform)&&!!env.SOLANA_RPC_URL;
  const authenticated=installAuth(app,db,origin);installNito(app,{env,authenticated});await installBounties(app,{db,storage,env,authenticated,payments});await installQueryMarket(app,{db,storage,env,authenticated});await installBlindTrials(app,{db,storage,env,authenticated});await installAgentTools(app,{db,storage,env,authenticated});installConsentLedger(app,{db,authenticated,licenses:LICENSES,bountyTerms:BOUNTY_TERMS,gapTerms:GAP_BOUNTY_TERMS});const audit=async(wallet,action,resource)=>db.query('INSERT INTO audit(id,wallet,action,resource,created) VALUES(?,?,?,?,?)',[randomUUID(),wallet,action,resource,Date.now()]);
+ await installBenchmarkBuilder(app,{db,storage,authenticated});
+ await installDataEscrow(app,{db,storage,authenticated,env});
  await installSettlementHook(app,{db,env});
  await installPrivateSql(app,{db,storage,authenticated,protectedRuntime});
  app.get('/api/agent-replay/status', (req, res) => res.json({ enabled: protectedRuntime }));
