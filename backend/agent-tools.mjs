@@ -1,3 +1,4 @@
+import {installDecisionAppeals} from "./decision-appeals.mjs";
 import {installEvidencePacks} from './evidence-packs.mjs';
 import {installAgentRooms} from './agent-rooms.mjs';
 import {DATA_REQUEST_TERMS,installDataRequests} from './data-requests.mjs';
@@ -78,6 +79,7 @@ export async function installAgentTools(app,{db,storage,env,authenticated,build=
   req.grant=grant;next();
  };
  await installEvidencePacks(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
+ await installDecisionAppeals(app,{db,storage,authenticated,sourceAvailable,grantSelect});
  await installAgentMemory(app,{db,storage,bearer,authenticated,sourceAvailable,grantSelect});
  const release=(grant,id,amount=0)=>db.query(`UPDATE agent_grants SET pending=NULL,spent=spent-? WHERE id=? AND pending=?`,
   [amount,grant.id,id]);

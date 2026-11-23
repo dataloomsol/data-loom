@@ -1,3 +1,4 @@
+import {initDecisionAppeals} from "./decision-appeals.js";
 import {initDatasetDiff} from "./dataset-diff.js";
 import {initBenchmarkBuilder} from './benchmark-builder.js';
 import {initDataEscrow} from './data-escrow.js';
@@ -20,6 +21,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  const datasetDiff=initDatasetDiff({panel,api,requireIdentity,identity});
  const escrow=initDataEscrow({panel,api,requireIdentity,identity,escape,money,walletState});
  const packs=initEvidencePacks({panel,api,requireIdentity,identity});
+ const appeals=initDecisionAppeals({panel,api,requireIdentity,identity});
  const rooms=initAgentRooms({panel,api,requireIdentity,identity,escape,money});
  const requests=initDataRequests({panel,api,requireIdentity,identity,escape,money});
  async function refresh(viewer){
@@ -123,7 +125,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  });
  document.addEventListener('loom-identity-change',()=>{
   key.value='';keyBox.hidden=true;result.textContent='';account.hidden=true;feedback.textContent='';
-  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();
+  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();
   for(const id of ['agent-tool-list','agent-grant-list','agent-calls'])el(id).replaceChildren();
  });
 }
