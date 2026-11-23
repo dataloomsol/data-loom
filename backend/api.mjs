@@ -1,3 +1,4 @@
+import {installPrivateAggregate} from "./private-aggregate.mjs";
 import {installDatasetDiff} from "./dataset-diff.mjs";
 import {installBenchmarkBuilder} from './benchmark-builder.mjs';
 import {installDataEscrow} from './data-escrow.mjs';
@@ -29,6 +30,7 @@ export async function installApi(app,{db,storage,env,protectedRuntime=false}){co
  await installDataEscrow(app,{db,storage,authenticated,env});
  await installSettlementHook(app,{db,env});
  await installPrivateSql(app,{db,storage,authenticated,protectedRuntime});
+ await installPrivateAggregate(app,{db,storage,authenticated,env,protectedRuntime});
  app.get('/api/agent-replay/status', (req, res) => res.json({ enabled: protectedRuntime }));
  app.post('/api/agent-replay', authenticated, (req, res) => {
   if (!protectedRuntime) return res.status(503).json({ error: 'Protected replay is unavailable' });
