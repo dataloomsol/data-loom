@@ -1,3 +1,4 @@
+import {installPrivateValidation} from './private-validation.mjs';
 import {installByom} from './byom.mjs';
 import {installPrivateAggregate} from "./private-aggregate.mjs";
 import {installDatasetDiff} from "./dataset-diff.mjs";
@@ -28,6 +29,7 @@ export async function installApi(app,{db,storage,env,protectedRuntime=false,atte
  const authenticated=installAuth(app,db,origin);installNito(app,{env,authenticated});await installBounties(app,{db,storage,env,authenticated,payments});await installQueryMarket(app,{db,storage,env,authenticated});await installBlindTrials(app,{db,storage,env,authenticated});await installAgentTools(app,{db,storage,env,authenticated});installConsentLedger(app,{db,authenticated,licenses:LICENSES,bountyTerms:BOUNTY_TERMS,gapTerms:GAP_BOUNTY_TERMS});const audit=async(wallet,action,resource)=>db.query('INSERT INTO audit(id,wallet,action,resource,created) VALUES(?,?,?,?,?)',[randomUUID(),wallet,action,resource,Date.now()]);
  await installBenchmarkBuilder(app,{db,storage,authenticated});
  await installByom(app,{db,storage,authenticated,env,attestationClient});
+ installPrivateValidation(app,{db,storage,authenticated,env,attestationClient});
  installDatasetDiff(app,{db,storage,authenticated});
  await installDataEscrow(app,{db,storage,authenticated,env});
  await installSettlementHook(app,{db,env});
