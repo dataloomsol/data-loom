@@ -1,3 +1,4 @@
+import {initDataAblation} from './data-ablation.js';
 import {initDataCoverage} from './data-coverage.js';
 import {initPrivateValidation} from './private-validation.js';
 import {initByom} from './byom.js';
@@ -22,6 +23,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  };
  const validation=initPrivateValidation({panel,api,requireIdentity,identity});
  const coverage=initDataCoverage({panel,api,requireIdentity,identity});
+ const ablation=initDataAblation({panel,api,requireIdentity,identity});
  const byom=initByom({panel,api,requireIdentity,identity});
  const builder=initBenchmarkBuilder({panel,api,requireIdentity,identity,escape});
  const datasetDiff=initDatasetDiff({panel,api,requireIdentity,identity});
@@ -132,7 +134,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  });
  document.addEventListener('loom-identity-change',()=>{
   key.value='';keyBox.hidden=true;result.textContent='';account.hidden=true;feedback.textContent='';
-  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();
+  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();ablation.clear();
   for(const id of ['agent-tool-list','agent-grant-list','agent-calls'])el(id).replaceChildren();
  });
 }

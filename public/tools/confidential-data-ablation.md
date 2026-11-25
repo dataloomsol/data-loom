@@ -1,0 +1,11 @@
+# Confidential Data Ablation
+
+Open **Account → Manage tools and grants → Confidential Data Ablation**. The buyer creates a study with one private benchmark version and two to five distinct private training versions. Share the study ID and buyer wallet with the dataset owners. Each owner approves their version for its specific role before the buyer runs the study. Owners can revoke approval before the report is released.
+
+Training datasets are JSON arrays containing 2–1,000 objects with `text` and `label` strings. The benchmark uses the existing private benchmark format with 10–20 distinct prompts and expected class labels. Every training fold needs 2–32 labels and a nonempty vocabulary. Data Loom checks for exact tokenized overlap between training text and held-out prompts. Keep near-duplicates and other related training examples out of the benchmark when preparing it.
+
+Data Loom trains a fixed bag-of-words multinomial Naive Bayes classifier on all sources, then trains the same classifier while leaving out each source in turn. Every run uses the same holdout. Each reported difference is the full model's accuracy minus the accuracy without that source, rounded to the nearest 20 percentage points. A positive result means including the source improved this experiment. Zero can include small changes in either direction. Results depend on the other sources and the chosen benchmark. They measure this classifier and experiment.
+
+The buyer receives dataset commitments, rounded differences, method metadata and a Phala quote. Training records, benchmark cases, learned models, predictions and absolute scores stay in the protected runtime. An identical stored benchmark can release one ablation report. This is a disclosure limit and rounding provides coarse results. Neither provides formal differential privacy. A released report remains retrievable by its buyer. Studies do not charge for or grant a dataset license.
+
+To verify the downloadable report, compute SHA-256 of the UTF-8 bytes of `JSON.stringify(report)` in the returned field order and compare with `attestation.reportData`. Verify the Phala quote against the approved Data Loom app and host measurement. Its report data must contain that digest followed by zero padding.
