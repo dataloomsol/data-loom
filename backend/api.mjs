@@ -1,3 +1,4 @@
+import {installDataCoverage} from './data-coverage.mjs';
 import {installComputeCapsules} from './compute-capsules.mjs';
 import {installPrivateValidation} from './private-validation.mjs';
 import {installByom} from './byom.mjs';
@@ -32,6 +33,7 @@ export async function installApi(app,{db,storage,env,protectedRuntime=false,atte
  await installByom(app,{db,storage,authenticated,env,attestationClient});
  await installComputeCapsules(app,{db,storage,authenticated,env,protectedRuntime,hostAppId});
  installPrivateValidation(app,{db,storage,authenticated,env,attestationClient});
+ await installDataCoverage(app,{db,storage,authenticated,env,attestationClient});
  installDatasetDiff(app,{db,storage,authenticated});
  await installDataEscrow(app,{db,storage,authenticated,env});
  await installSettlementHook(app,{db,env});

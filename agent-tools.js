@@ -1,3 +1,4 @@
+import {initDataCoverage} from './data-coverage.js';
 import {initPrivateValidation} from './private-validation.js';
 import {initByom} from './byom.js';
 import {initDecisionAppeals} from "./decision-appeals.js";
@@ -20,6 +21,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
   finally{button.disabled=false}
  };
  const validation=initPrivateValidation({panel,api,requireIdentity,identity});
+ const coverage=initDataCoverage({panel,api,requireIdentity,identity});
  const byom=initByom({panel,api,requireIdentity,identity});
  const builder=initBenchmarkBuilder({panel,api,requireIdentity,identity,escape});
  const datasetDiff=initDatasetDiff({panel,api,requireIdentity,identity});
@@ -35,6 +37,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
   await rooms.refresh(viewer,state);
   if(identity()!==viewer)return;
   datasetDiff.setDatasets(datasets);
+  coverage.setDatasets(datasets);
   create.elements.dataset.innerHTML=datasets.filter(d=>d.state!=='published').map(d=>`<option value="${escape(d.id)}">${escape(d.title)}</option>`).join('')||'<option value="">Store a private dataset first</option>';
   el('agent-tool-list').innerHTML=state.tools.map(tool=>`<form class="account-record" data-grant-tool="${escape(tool.id)}">
    <h4>${escape(tool.name)} · ${money(tool.price)} USDC per call</h4><p>${escape(tool.purpose)}</p>
@@ -129,7 +132,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  });
  document.addEventListener('loom-identity-change',()=>{
   key.value='';keyBox.hidden=true;result.textContent='';account.hidden=true;feedback.textContent='';
-  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();
+  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();
   for(const id of ['agent-tool-list','agent-grant-list','agent-calls'])el(id).replaceChildren();
  });
 }
