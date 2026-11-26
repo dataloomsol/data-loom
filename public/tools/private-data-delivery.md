@@ -9,3 +9,7 @@ The contributor stores an update with the licensed version selected as its direc
 The deployment operator sets the sealed `DATA_DELIVERY_DESTINATIONS` JSON mapping from buyer wallet addresses to `{"url":"https://receiver.example/webhook","secret":"<random shared secret, at least 32 characters>"}`. Approve only trusted receivers controlled by the associated buyer. Data Loom accepts exact operator-configured HTTPS destinations and rejects redirects. Exchange each signing secret privately. The feature requires the approved confidential runtime.
 
 Verify `X-Data-Loom-Signature` using HMAC-SHA256 over `X-Data-Loom-Timestamp + "." + raw request body`. Compare the full `sha256=<hex>` signature in constant time and reject stale timestamps. Use `Idempotency-Key` as the durable event ID and return a 2xx response after accepting it. Data Loom may send the same event again after timeouts or interrupted delivery. Retries use the original event ID and a fresh signature, with up to six attempts. Pausing either dataset, removing the subscription, or losing the parent license stops further attempts while the event is ineligible.
+
+## Hosted receiver
+
+For the platform wallet, the operator can point its approved destination at `APP_ORIGIN/webhooks/dataloom`. The included receiver verifies the timestamp and signature over the raw request and records each event ID once. The configured platform wallet can read its latest 100 accepted events with a signed-in session at `GET /api/data-delivery/inbox`.

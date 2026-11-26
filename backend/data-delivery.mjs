@@ -1,4 +1,4 @@
-import {createHmac,randomUUID} from 'node:crypto';
+import {createHmac,randomUUID,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import {unpaused} from './consent-ledger.mjs';
 import {hash,validWallet} from './security.mjs';
@@ -41,6 +41,32 @@ export async function installDataDelivery(app,{db,storage,authenticated,protecte
     'CREATE TABLE IF NOT EXISTS delivery_releases (version TEXT PRIMARY KEY,created BIGINT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS delivery_outbox (id TEXT PRIMARY KEY,subscription TEXT NOT NULL,version TEXT NOT NULL,body TEXT NOT NULL,attempts INTEGER NOT NULL,retry_at BIGINT NOT NULL,delivered INTEGER NOT NULL)'
   ]) await db.query(sql);
+
+  const inboxWallet = env.PLATFORM_WALLET;
+  const inbox = destinations.get(inboxWallet);
+  if (inbox?.url === (env.APP_ORIGIN || '')+'/webhooks/dataloom') {
+    await db.query('CREATE TABLE IF NOT EXISTS delivery_inbox (id TEXT PRIMARY KEY,body TEXT NOT NULL,received BIGINT NOT NULL)');
+    app.post('/webhooks/dataloom',async(req,res) => {
+      res.set('Cache-Control','no-store');
+      const timestamp = req.get('X-Data-Loom-Timestamp') || '';
+      const signature = req.get('X-Data-Loom-Signature') || '';
+      if (!/^\d{10}$/.test(timestamp) || Math.abs(Date.now()/1000-Number(timestamp))>300 ||
+          !/^sha256=[a-f0-9]{64}$/.test(signature) || !req.deliveryRawBody) return res.sendStatus(401);
+      const expected = createHmac('sha256',inbox.secret).update(timestamp+'.').update(req.deliveryRawBody).digest();
+      if (!timingSafeEqual(expected,Buffer.from(signature.slice(7),'hex'))) return res.sendStatus(401);
+      const {eventId,type} = req.body || {};
+      if (type !== 'dataloom.dataset.version.ready.v1' || !uuid.safeParse(eventId).success ||
+          eventId !== req.get('Idempotency-Key')) return res.sendStatus(400);
+      await db.query('INSERT INTO delivery_inbox VALUES(?,?,?) ON CONFLICT(id) DO NOTHING',
+        [eventId,req.deliveryRawBody.toString('utf8'),Date.now()]);
+      res.sendStatus(204);
+    });
+    app.get(base+'/inbox',authenticated,async(req,res) => {
+      if (req.wallet !== inboxWallet) return res.sendStatus(403);
+      const {rows} = await db.query('SELECT body,received FROM delivery_inbox ORDER BY received DESC LIMIT 100');
+      res.json({events:rows.map(row => ({...JSON.parse(row.body),received:Number(row.received)}))});
+    });
+  }
 
   app.get(base+'/subscriptions',authenticated,async(req,res) => {
     const {rows} = await db.query('SELECT id,parent,checks FROM delivery_subscriptions WHERE buyer=? ORDER BY parent',[req.wallet]);
