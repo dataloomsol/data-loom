@@ -16,6 +16,7 @@ try{
  environment.NITO_MODEL = '${NITO_MODEL:-deepseek/deepseek-v4.1-flash:encrypted}';
  environment.SETTLEMENT_WEBHOOK_URL = '\${SETTLEMENT_WEBHOOK_URL:-}';
  environment.SETTLEMENT_WEBHOOK_SECRET = '\${SETTLEMENT_WEBHOOK_SECRET:-}';
+ environment.DATA_DELIVERY_DESTINATIONS = '${DATA_DELIVERY_DESTINATIONS:-}';
  const compose={volumes:{'loom-state':{}},services:{'data-loom':{image:'node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c',platform:'linux/amd64',volumes:['/var/run/dstack.sock:/var/run/dstack.sock','loom-state:/data'],restart:'unless-stopped',ports:['9200:9200'],environment,command:['node','-e',fs.readFileSync(path.join(root,'deploy/bootstrap.cjs'),'utf8')],logging:{driver:'json-file',options:{'max-size':'10m','max-file':'2'}}}}};
  fs.writeFileSync(path.join(out,'docker-compose.json'),JSON.stringify(compose,null,2));console.log(JSON.stringify({artifact:path.join(out,'loom.bin'),sha256:digest,compose:path.join(out,'docker-compose.json'),secretFile:path.join(out,'release.env')}));
 }finally{fs.rmSync(temp,{recursive:true,force:true})}

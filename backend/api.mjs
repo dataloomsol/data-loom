@@ -1,3 +1,4 @@
+import {installDataDelivery} from './data-delivery.mjs';
 import {installDataAblation} from './data-ablation.mjs';
 import {installDataCoverage} from './data-coverage.mjs';
 import {installComputeCapsules} from './compute-capsules.mjs';
@@ -39,6 +40,7 @@ export async function installApi(app,{db,storage,env,protectedRuntime=false,atte
  installDatasetDiff(app,{db,storage,authenticated});
  await installDataEscrow(app,{db,storage,authenticated,env});
  await installSettlementHook(app,{db,env});
+ await installDataDelivery(app,{db,storage,authenticated,env,protectedRuntime});
  await installPrivateSql(app,{db,storage,authenticated,protectedRuntime});
  await installPrivateAggregate(app,{db,storage,authenticated,env,protectedRuntime});
  app.get('/api/agent-replay/status', (req, res) => res.json({ enabled: protectedRuntime }));
