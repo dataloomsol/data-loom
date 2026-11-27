@@ -1,3 +1,4 @@
+import {initSealedAuctions} from './sealed-auctions.js';
 import {initDataDelivery} from './data-delivery.js';
 import {initDataAblation} from './data-ablation.js';
 import {initDataCoverage} from './data-coverage.js';
@@ -11,7 +12,7 @@ import {initEvidencePacks} from './evidence-packs.js';
 import {initAgentRooms} from './agent-rooms.js';
 import {initDataRequests} from './data-requests.js';
 import {initAgentBatches} from './agent-batches.js';
-export function initAgentTools({api,requireIdentity,escape,money,identity,walletState}){
+export function initAgentTools({api,requireIdentity,escape,money,beginPurchase,identity,walletState}){
  const el=id=>document.getElementById(id);
  const panel=el('agent-tools'),feedback=el('agent-feedback'),account=el('agent-account');
  const create=el('agent-create'),keyBox=el('agent-key-box'),key=el('agent-key'),result=el('agent-call-result');
@@ -22,6 +23,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
   try{await fn()}catch(error){feedback.textContent=error.message}
   finally{button.disabled=false}
  };
+ const auctions=initSealedAuctions({panel,api,requireIdentity,identity,money,beginPurchase});
  const validation=initPrivateValidation({panel,api,requireIdentity,identity});
  const coverage=initDataCoverage({panel,api,requireIdentity,identity});
  const ablation=initDataAblation({panel,api,requireIdentity,identity});
@@ -136,7 +138,7 @@ export function initAgentTools({api,requireIdentity,escape,money,identity,wallet
  });
  document.addEventListener('loom-identity-change',()=>{
   key.value='';keyBox.hidden=true;result.textContent='';account.hidden=true;feedback.textContent='';
-  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();ablation.clear();delivery.clear();
+  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();ablation.clear();delivery.clear();auctions.clear();
   for(const id of ['agent-tool-list','agent-grant-list','agent-calls'])el(id).replaceChildren();
  });
 }
