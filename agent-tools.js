@@ -1,3 +1,4 @@
+import {initExclusivity} from './exclusivity.js';
 import {initSealedAuctions} from './sealed-auctions.js';
 import {initDataDelivery} from './data-delivery.js';
 import {initDataAblation} from './data-ablation.js';
@@ -23,6 +24,7 @@ export function initAgentTools({api,requireIdentity,escape,money,beginPurchase,i
   try{await fn()}catch(error){feedback.textContent=error.message}
   finally{button.disabled=false}
  };
+ const exclusivity=initExclusivity({panel,api,requireIdentity,identity,money,beginPurchase});
  const auctions=initSealedAuctions({panel,api,requireIdentity,identity,money,beginPurchase});
  const validation=initPrivateValidation({panel,api,requireIdentity,identity});
  const coverage=initDataCoverage({panel,api,requireIdentity,identity});
@@ -138,7 +140,7 @@ export function initAgentTools({api,requireIdentity,escape,money,beginPurchase,i
  });
  document.addEventListener('loom-identity-change',()=>{
   key.value='';keyBox.hidden=true;result.textContent='';account.hidden=true;feedback.textContent='';
-  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();ablation.clear();delivery.clear();auctions.clear();
+  batches.clear();requests.clear();rooms.clear();packs.clear();escrow.clear();builder.clear();datasetDiff.clear();appeals.clear();byom.clear();validation.clear();coverage.clear();ablation.clear();delivery.clear();auctions.clear();exclusivity.clear();
   for(const id of ['agent-tool-list','agent-grant-list','agent-calls'])el(id).replaceChildren();
  });
 }
